@@ -91,17 +91,14 @@ begin
 		TElementKind.Header: begin
 				result += element.Translate[0] + sLineBreak;
 
-				if (i + 1 < parser.Elements.Count)
-				and (parser.Elements.Items[i + 1].Kind <> TElementKind.Header)
+				if (i + 1 >= parser.Elements.Count)
+				or (parser.Elements.Items[i + 1].Kind <> TElementKind.Header)
 				then
-					result += MakeHorSeperator(MAX_WIDTH) + sLineBreak
-							  + sLineBreak;
+					result += MakeHorSeperator(MAX_WIDTH) + sLineBreak;
 			end;
 		TElementKind.Paragraph: begin
 				for s in element.Translate do
 					result += DoWrapping(INDENT + s);
-
-				result += sLineBreak;
 			end;
 		TElementKind.Block: begin
 				for s in element.Translate do

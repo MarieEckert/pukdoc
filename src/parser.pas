@@ -210,7 +210,13 @@ begin
 	case FState of
 	TParserState.Paragraph: begin
 		if Length(trimmed) = 0 then
+		begin
+			if FCurrentParagraph = Nil then
+				FCurrentParagraph := TParagraph.Create;
+
+			FCurrentParagraph.AddLine('');
 			exit(True);
+		end;
 
 		if trimmed[1] = '#' then
 		begin
@@ -241,7 +247,7 @@ begin
 		if FCurrentParagraph = Nil then
 			FCurrentParagraph := TParagraph.Create;
 
-		FCurrentParagraph.AddLine(trimmed);
+		FCurrentParagraph.AddLine(line);
 	end;
 	TParserState.TableSeperator: begin
 		FState := TParserState.TableBody;
