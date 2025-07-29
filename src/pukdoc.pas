@@ -83,7 +83,7 @@ var
 begin
 	parser := TParser.Create;
 
-	Assign(f, './example.md');
+	Assign(f, ParamStr(1));
 	ReSet(f);
 
 	while not eof(f) do
