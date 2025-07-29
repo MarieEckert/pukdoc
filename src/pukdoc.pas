@@ -112,8 +112,7 @@ begin
 			Halt(1);
 	end;
 
-	if not parser.ParseLine('') then
-		Halt(2);
+	parser.Finish;
 
 	Close(inFile);
 

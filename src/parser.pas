@@ -47,6 +47,7 @@ type
 	public
 		constructor	Create;
 		function	ParseLine(const line: String): Boolean;
+		procedure	Finish;
 
 		property	Sections: TSections read FSections;
 		property	Elements: TElements read FElements;
@@ -262,6 +263,18 @@ begin
 	end;
 
 	exit(true);
+end;
+
+procedure TParser.Finish;
+begin
+	if FCurrentParagraph <> Nil then
+		FElements.Add(FCurrentParagraph);
+
+	if FCurrentBlock <> Nil then
+		FElements.Add(FCurrentBlock);
+
+	if FCurrentTable <> Nil then
+		FElements.Add(FCurrentTable);
 end;
 
 end.
