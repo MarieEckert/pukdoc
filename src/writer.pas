@@ -91,15 +91,23 @@ var
 	s, tmp		: String;
 	rem			: TStringDynArray;
 	element		: TElement;
+	firstHeader	: Boolean;
 begin
 	result := '';
 
+	firstHeader := True;
 	for i := 0 to parser.Elements.Count - 1 do
 	begin
 		element := parser.Elements.Items[i];
 
 		case element.Kind of
 		TElementKind.Header: begin
+				if firstHeader then
+				begin
+					firstHeader := False;
+					continue;
+				end;
+
 				result += element.Translate[0] + sLineBreak;
 
 				if (i + 1 >= parser.Elements.Count)
