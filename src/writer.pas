@@ -8,8 +8,12 @@ unit writer;
 interface
 
 uses
+	Character,
 	elements,
-	parser;
+	parser,
+	StrUtils,
+	SysUtils,
+	Types;
 
 procedure WriteParsed(constref parser: TParser; var dest: TextFile);
 
@@ -41,10 +45,41 @@ begin
 end;
 
 function GenerateBody(constref parser: TParser): String;
+
+	function DoWrapping(constref str: String): String;
+	var
+		rem						: String;
+		ix, lastWhite, width	: Integer;
+		split					: TStringDynArray;
+	begin
+		width := 0;
+		lastWhite := Length(str);
+
+		if Length(str) <= MAX_WIDTH then
+			exit(str + sLineBreak);
+
+		for ix := 1 to Length(str) do
+		begin
+			Inc(width);
+			if width > MAX_WIDTH then
+			begin
+				result := TrimRight(Copy(str, 1, lastWhite));
+
+				rem := Trim(Copy(str, lastWhite + 1, Length(str) - lastWhite));
+				result += sLineBreak + DoWrapping(INDENT + rem);
+				exit;
+			end;
+
+			if IsWhiteSpace(str[ix]) and (ix > Length(INDENT)) then
+				lastWhite := ix;
+		end;
+	end;
+
 var
-	i		: Integer;
-	s		: String;
-	element	: TElement;
+	i			: Integer;
+	s, tmp		: String;
+	rem			: TStringDynArray;
+	element		: TElement;
 begin
 	result := '';
 
@@ -62,10 +97,9 @@ begin
 					result += MakeHorSeperator(MAX_WIDTH) + sLineBreak
 							  + sLineBreak;
 			end;
-		TElementKind.Table,
 		TElementKind.Paragraph: begin
 				for s in element.Translate do
-					result += INDENT + s + sLineBreak;
+					result += DoWrapping(INDENT + s);
 
 				result += sLineBreak;
 			end;
@@ -74,6 +108,12 @@ begin
 					result += s + sLineBreak;
 
 				result += sLineBreak;
+			end;
+		TElementKind.Table: begin
+				for s in element.Translate do
+					result += INDENT + s + sLineBreak;
+
+				result += sLineBreak;;
 			end;
 		end;
 	end;
