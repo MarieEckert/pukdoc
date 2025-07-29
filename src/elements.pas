@@ -13,7 +13,7 @@ uses
 	Types;
 
 type
-	TElementKind = (Header, Paragraph, Block, Table);
+	TElementKind = (Header, Paragraph, List, Block, Table);
 
 	TElement = interface
 		function GetKind: TElementKind;
@@ -47,6 +47,37 @@ type
 		procedure	AddLine(line: String);
 
 		property	Kind: TElementKind read GetKind;
+	end;
+
+	TListItemStyle = (Bullet, Number);
+
+	TListItem = class
+	private
+		FText	: String;
+		FStyle	: TListItemStyle;
+		FDepth	: Integer;
+	public
+		constructor	Create(text: String; style: TListItemStyle; depth: Integer);
+
+		property	Text: String read FText write FText;
+		property	Style: TListItemStyle read FStyle write FStyle;
+		property	Depth: Integer read FDepth write FDepth;
+	end;
+
+	TListItems = specialize TFPGList<TListItem>;
+
+	TList = class(TInterfacedObject, TElement)
+	private
+		FItems	: TListItems;
+	public
+		constructor	Create;
+		function	GetKind: TElementKind;
+		function	Translate: TStringDynArray;
+		procedure	AddItem(
+						text: String;
+						style: TListItemStyle;
+						depth: Integer
+					);
 	end;
 
 	TBlock = class(TInterfacedObject, TElement)
@@ -126,6 +157,41 @@ procedure TParagraph.AddLine(line: String);
 begin
 	SetLength(FLines, Length(FLines) + 1);
 	FLines[High(FLines)] := line;
+end;
+
+{ class TListItem }
+
+constructor TListItem.Create(
+	text: String;
+	style: TListItemStyle;
+	depth: Integer
+);
+begin
+	FText := text;
+	FStyle := style;
+	FDepth := depth;
+end;
+
+{ class TList }
+
+constructor TList.Create;
+begin
+	FItems := TListItems.Create;
+end;
+
+function TList.GetKind: TElementKind;
+begin
+	exit(TElementKind.List);
+end;
+
+function TList.Translate: TStringDynArray;
+begin
+	exit([]);
+end;
+
+procedure TList.AddItem(text: String; style: TListItemStyle; depth: Integer);
+begin
+	FItems.Add(TListItem.Create(text, style, depth));
 end;
 
 { class TBlock }

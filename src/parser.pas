@@ -26,7 +26,7 @@ type
 
 	TSections = specialize TFPGList<TSection>;
 
-	TParserState = (Paragraph, TableSeperator, TableBody, Block);
+	TParserState = (Paragraph, TableSeperator, TableBody, Block, List);
 
 	TParser = class
 	private
