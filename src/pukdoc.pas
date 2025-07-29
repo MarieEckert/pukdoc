@@ -93,6 +93,9 @@ begin
 			halt(1);
 	end;
 
+	if not parser.ParseLine('') then
+		halt(2);
+
 	Close(f);
 
 	WriteLn(GenerateHeader(parser));
