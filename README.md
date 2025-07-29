@@ -1,14 +1,14 @@
 # pukdoc
 
-initially documentation for PµK was written in a custom format as raw UTF-8.
-after some time we realised that we might also want to provide this
+initially, documentation for PµK was written as plain UTF-8 text with specific
+formatting. after some time we realised that we might also want to provide this
 documentation in other formats such as HTML.
 
-given that the custom format is could be a bit annoying to parse and it is
-annoying to write from hand anyway, we thought why not move to markdown and
-write a converter to our style.
+given that the our formatting could be a bit annoying to parse and is annoying
+to write by hand anyway, we thought "why not move to markdown and write a
+converter to our style?".
 
-and this is that converter.
+this is that converter.
 
 ## usage
 
