@@ -12,12 +12,20 @@ this is that converter.
 
 ## usage
 
-**this is subject to change since i have not yet invested any time into making
-this pleasent to use**
+```
+usage: pukdoc [input file] [additional arguments]
 
-`pukdoc <input>` converts the given file and writes the result to stdout.
+if no input file is provided, input is read from stdin.
+if no output file is provided, output is written to stdout.
 
-`pukdoc` reads from stdin and also writes the result to stdout.
+ARGUMENTS
+  --out | -o <file>
+    Specify an output file
+  --version | -v
+    Show the version of the program
+  --help | -h
+    Show this help text
+```
 
 ## on input formatting
 
@@ -30,3 +38,10 @@ these are some of the limitations that apply:
 1. codeblocks must be opened on a seperate line
 2. codeblocks must be closed on a seperate line
 3. special formatting is ignored (bold, italic, links, monospace, quotes, etc.)
+
+## todo
+
+* [ ] wrap tables if they exceed 80 columns (headache)
+* [ ] parse lists
+  * [ ] translate them back accordingly
+* [ ] cleanup or just rewrite the parser
