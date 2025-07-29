@@ -50,6 +50,8 @@ function GenerateBody(constref parser: TParser): String;
 	var
 		rem						: String;
 		ix, lastWhite, width	: Integer;
+		initialIndent			: Integer;
+		firstNonSpaceHit		: Boolean;
 		split					: TStringDynArray;
 	begin
 		width := 0;
@@ -58,6 +60,9 @@ function GenerateBody(constref parser: TParser): String;
 		if Length(str) <= MAX_WIDTH then
 			exit(str + sLineBreak);
 
+		initialIndent := 0;
+		firstNonSpaceHit := False;
+
 		for ix := 1 to Length(str) do
 		begin
 			Inc(width);
@@ -65,13 +70,19 @@ function GenerateBody(constref parser: TParser): String;
 			begin
 				result := TrimRight(Copy(str, 1, lastWhite));
 
-				rem := Trim(Copy(str, lastWhite + 1, Length(str) - lastWhite));
-				result += sLineBreak + DoWrapping(INDENT + rem);
+				rem := StringOfChar(' ', initialIndent)
+					 + Trim(Copy(str, lastWhite + 1, Length(str) - lastWhite));
+				result += sLineBreak + DoWrapping(rem);
 				exit;
 			end;
 
-			if IsWhiteSpace(str[ix]) and (ix > Length(INDENT)) then
-				lastWhite := ix;
+			if IsWhiteSpace(str[ix]) then
+				if firstNonSpaceHit then
+					lastWhite := ix
+				else
+					Inc(initialIndent)
+			else
+				firstNonSpaceHit := True;
 		end;
 	end;
 
