@@ -45,7 +45,6 @@ function ParseParams: TParams;
 var
 	i, skip: Integer;
 	s: String;
-	c: Char;
 begin
 	result.InPath := '';
 	result.OutPath := '';
@@ -69,7 +68,12 @@ begin
 		else if (s = '-v') or (s = '--version') then
 			result.Version := True
 		else if i = 1 then
-			result.InPath := s;
+			result.InPath := s
+		else begin
+			WriteLn(StdErr, 'Argument Error');
+			WriteLn(StdErr, '==> Invalid argument "', s, '" at position ', i);
+			Halt(1);
+		end;
 	end;
 end;
 
