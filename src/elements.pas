@@ -10,6 +10,7 @@ interface
 uses
 	fgl,
 	regexpr,
+	StrUtils,
 	SysUtils,
 	Types,
 	util;
@@ -136,7 +137,10 @@ type
 	end;
 
 	TTable = class(TInterfacedObject, TElement)
+	type
+		TTableState = (Header, Seperator, Body);
 	private
+		FState		: TTableState;
 		FHeaders	: TStringDynArray;
 		FRows		: array of TStringDynArray;
 	public
@@ -155,18 +159,7 @@ const
 	LIST_ELEMENT_REGEX = '[ ]*([-+*]|[0-9]+[\.\)])[ ]+.*';
 	TABLE_START_REGEX = '[ ]{0,3}\|.*\|';
 
-function MakeHorSeperator(w: Integer): String;
-
 implementation
-
-function MakeHorSeperator(w: Integer): String;
-var
-	i: Integer;
-begin
-	result := '';
-	for i := 1 to w do
-		result += UTF8String('─');
-end;
 
 { class THeading }
 
@@ -366,7 +359,7 @@ end;
 
 function TFencedCode.Translate: TStringDynArray;
 begin
-	exit([]);
+	exit(FLines);
 end;
 
 function TFencedCode.ConsumeLine(line: String): Boolean;
@@ -425,6 +418,7 @@ end;
 
 constructor TTable.Create;
 begin
+	FState := TTableState.Header;
 end;
 
 function TTable.GetKind: TElementKind;
@@ -455,7 +449,6 @@ var
 	tmp, upper, lower, sep, header	: String;
 	i								: Integer;
 begin
-{
 	SetLength(columnWidths, Length(FHeaders));
 	for i := 0 to Length(FHeaders) - 1 do
 	begin
@@ -502,12 +495,37 @@ begin
 	end;
 
 	result[High(result)] := lower;
-}
 end;
 
 function TTable.ConsumeLine(line: String): Boolean;
+var
+	ix		: Integer;
+	strs	: TStringDynArray;
 begin
-	exit(False);
+	if not ExecRegExpr(TABLE_START_REGEX, line) then
+		exit(False);
+
+	if FState = TTableState.Seperator then
+	begin
+		FState := TTableState.Body;
+		exit(True);
+	end;
+
+	strs := SplitString(Copy(line, 2, RPos('|', line) - 2), '|');
+	for ix := 0 to Length(strs) - 1 do
+		strs[ix] := Trim(strs[ix]);
+
+	if FState = TTableState.Header then
+	begin
+		FHeaders := strs;
+		FState := TTableState.Seperator;
+	end else
+	begin
+		SetLength(FRows, Length(FRows) + 1);
+		FRows[High(FRows)] := strs;
+	end;
+
+	exit(True);
 end;
 
 end.

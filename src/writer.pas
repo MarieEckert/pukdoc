@@ -13,7 +13,8 @@ uses
 	parser,
 	StrUtils,
 	SysUtils,
-	Types;
+	Types,
+	util;
 
 procedure WriteParsed(constref parser: TParser; var dest: TextFile);
 
