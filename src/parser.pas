@@ -133,7 +133,7 @@ begin
 	begin
 		Debug('started a table element');
 		NewElement(TTable.Create, line);
-	end else
+	end else if Length(Trim(line)) > 0 then
 	begin
 		if (FElements.Count > 0) and (FElements.Last.Kind <> TElementKind.Paragraph) then
 		begin
@@ -144,7 +144,8 @@ begin
 			FOpenElement := True;
 			TryConsumption(line);
 		end;
-	end;
+	end else
+		Debug(Format('discarding line "%s"', [line]));
 
 	exit(True);
 end;

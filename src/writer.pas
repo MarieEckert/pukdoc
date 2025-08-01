@@ -114,11 +114,13 @@ begin
 				if (i + 1 >= parser.Elements.Count)
 				or (parser.Elements.Items[i + 1].Kind <> TElementKind.Heading)
 				then
-					result += MakeHorSeperator(MAX_WIDTH) + sLineBreak;
+					result += MakeHorSeperator(MAX_WIDTH) + sLineBreak + sLineBreak;
 			end;
 		TElementKind.Paragraph: begin
 				for s in element.Translate do
 					result += DoWrapping(INDENT + s);
+
+				result += sLineBreak;
 			end;
 		TElementKind.FencedCode: begin
 				for s in element.Translate do
