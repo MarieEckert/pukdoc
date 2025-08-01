@@ -9,32 +9,73 @@ interface
 
 uses
 	fgl,
+	regexpr,
+	StrUtils,
 	SysUtils,
-	Types;
+	Types,
+	util;
 
 type
-	TElementKind = (Header, Paragraph, List, Block, Table);
+	TElementKind = (
+		Heading,
+		IndentedCode,
+		FencedCode,
+		Paragraph,
+		BlockQuote,
+		ListItem,
+		List,
+		Table
+	);
 
 	TElement = interface
-		function GetKind: TElementKind;
+		function	GetKind: TElementKind;
+		{ Consume a line and parse it into the element.
+		  Should return True if the line has actually been consumed. }
+		function	ConsumeLine(line: String): Boolean;
 		{ Transforms the abstract representation into an array of lines }
-		function Translate: TStringDynArray;
+		function	Translate: TStringDynArray;
 
-		property Kind: TElementKind read GetKind;
+		property	Kind: TElementKind read GetKind;
 	end;
+
+	PElement = ^TElement;
 
 	TElements = specialize TFPGList<TElement>;
 
-	THeader = class(TInterfacedObject, TElement)
+	THeading = class(TInterfacedObject, TElement)
 	private
 		FLevel		: Integer;
 		FContent	: String;
 	public
-		constructor	Create(level: Integer; content: String);
+		constructor	Create;
 		function	GetKind: TElementKind;
+		function	ConsumeLine(line: String): Boolean;
 		function	Translate: TStringDynArray;
 
 		property	Kind: TElementKind read GetKind;
+	end;
+
+	TIndentedCode = class(TInterfacedObject, TElement)
+	public
+		constructor	Create;
+		function	GetKind: TElementKind;
+		function	Translate: TStringDynArray;
+		function	ConsumeLine(line: String): Boolean;
+	end;
+
+	TFencedCode = class(TInterfacedObject, TElement)
+	type
+		TState = (Start, Content, Closed);
+	private
+		FState	: TState;
+		FChar	: Char;
+		FInfo	: String;
+		FLines	: TStringDynArray;
+	public
+		constructor	Create;
+		function	GetKind: TElementKind;
+		function	Translate: TStringDynArray;
+		function	ConsumeLine(line: String): Boolean;
 	end;
 
 	TParagraph = class(TInterfacedObject, TElement)
@@ -44,20 +85,33 @@ type
 		constructor	Create;
 		function	GetKind: TElementKind;
 		function	Translate: TStringDynArray;
-		procedure	AddLine(line: String);
+		function	ConsumeLine(line: String): Boolean;
 
 		property	Kind: TElementKind read GetKind;
 	end;
 
+	TBlockQuote = class(TInterfacedObject, TElement)
+	private
+		FLines	: TStringDynArray;
+	public
+		constructor	Create;
+		function	GetKind: TElementKind;
+		function	Translate: TStringDynArray;
+		function	ConsumeLine(line: String): Boolean;
+	end;
+
 	TListItemStyle = (Bullet, Number);
 
-	TListItem = class
+	TListItem = class(TInterfacedObject, TElement)
 	private
 		FText	: String;
 		FStyle	: TListItemStyle;
 		FDepth	: Integer;
 	public
-		constructor	Create(text: String; style: TListItemStyle; depth: Integer);
+		constructor	Create;
+		function	GetKind: TElementKind;
+		function	Translate: TStringDynArray;
+		function	ConsumeLine(line: String): Boolean;
 
 		property	Text: String read FText write FText;
 		property	Style: TListItemStyle read FStyle write FStyle;
@@ -73,6 +127,8 @@ type
 		constructor	Create;
 		function	GetKind: TElementKind;
 		function	Translate: TStringDynArray;
+		function	ConsumeLine(line: String): Boolean;
+
 		procedure	AddItem(
 						text: String;
 						style: TListItemStyle;
@@ -80,59 +136,72 @@ type
 					);
 	end;
 
-	TBlock = class(TInterfacedObject, TElement)
-	private
-		FLanguage	: String;
-		FLines		: TStringDynArray;
-	public
-		constructor	Create(language: String);
-		function	GetKind: TElementKind;
-		function	Translate: TStringDynArray;
-		procedure	AddLine(line: String);
-
-		property	Kind: TElementKind read GetKind;
-	end;
-
 	TTable = class(TInterfacedObject, TElement)
+	type
+		TTableState = (Header, Seperator, Body);
 	private
+		FState		: TTableState;
 		FHeaders	: TStringDynArray;
 		FRows		: array of TStringDynArray;
 	public
-		constructor	Create(headers: TStringDynArray);
+		constructor	Create;
 		function	GetKind: TElementKind;
 		function	Translate: TStringDynArray;
-		procedure	AddRow(row: TStringDynArray);
+		function	ConsumeLine(line: String): Boolean;
 
 		property	Kind: TElementKind read GetKind;
 	end;
 
-function MakeHorSeperator(w: Integer): String;
+const
+	HEADING_REGEX = '[ ]{0,3}[#]{1,6}.*';
+	FENCED_CODE_REGEX = '[ ]{0,3}(```|~~~).*';
+	BLOCK_QUOTE_REGEX = '[ ]{0,3}>.*';
+	LIST_ELEMENT_REGEX = '[ ]*([-+*]|[0-9]+[\.\)])[ ]+.*';
+	TABLE_START_REGEX = '[ ]{0,3}\|.*\|';
 
 implementation
 
-function MakeHorSeperator(w: Integer): String;
+{ class THeading }
+
+constructor THeading.Create;
+begin
+	FLevel := -1;
+	FContent := '';
+end;
+
+function THeading.GetKind: TElementKind;
+begin
+	exit(TElementKind.Heading);
+end;
+
+function THeading.ConsumeLine(line: String): Boolean;
 var
-	i: Integer;
+	n: Integer;
 begin
-	result := '';
-	for i := 1 to w do
-		result += UTF8String('─');
+	Debug(Format('heading attempting to consume line (FLevel = %d)', [FLevel]));
+	if FLevel <> -1 then
+		exit(False);
+
+	line := Trim(line);
+	n := 1;
+	while (line[n] = '#') do
+		Inc(n);
+
+	FContent := Copy(line, n, Length(line) - 1 + 1);
+	FLevel := n - 1;
+
+	Debug(Format(
+		'parsed heading'#13#10'  -> content: %s'#13#10'  -> level: %d',
+		[
+			FContent,
+			FLevel
+		]
+	));
+
+	exit(True);
 end;
 
-{ class THeader }
-
-constructor THeader.Create(level: Integer; content: String);
-begin
-	FLevel := level;
-	FContent := content;
-end;
-
-function THeader.GetKind: TElementKind;
-begin
-	exit(TElementKind.Header);
-end;
-
-function THeader.Translate: TStringDynArray;
+function THeading.Translate: TStringDynArray;
 begin
 	exit([UpperCase(FContent)]);
 end;
@@ -153,23 +222,77 @@ begin
 	exit(FLines);
 end;
 
-procedure TParagraph.AddLine(line: String);
+function TParagraph.ConsumeLine(line: String): Boolean;
 begin
+	if Length(line) = 0 then
+	begin
+		Debug('line is empty, closing paragraph');
+		exit(False);
+	end;
+
 	SetLength(FLines, Length(FLines) + 1);
 	FLines[High(FLines)] := line;
+
+	Debug('appended one line to paragraph');
+
+	exit(True);
+end;
+
+{ class TBlockQuote }
+
+constructor TBlockQuote.Create;
+begin
+end;
+
+function TBlockQuote.GetKind: TElementKind;
+begin
+	exit(TElementKind.BlockQuote);
+end;
+
+function TBlockQuote.Translate: TStringDynArray;
+begin
+	exit([]);
+end;
+
+function TBlockQuote.ConsumeLine(line: String): Boolean;
+var
+	ix: Integer;
+begin
+	if not ExecRegExpr(BLOCK_QUOTE_REGEX, line) then
+		exit(False);
+
+	ix := Pos('>', line);
+
+	SetLength(FLines, Length(FLines) + 1);
+	FLines[High(FLines)] := Copy(line, ix + 1, Length(line) - ix);
+
+	Debug(Format(
+		'added one line to block quote'#13#10'  -> line: %s',
+		[FLines[High(FLines)]]
+	));
+
+	exit(True);
 end;
 
 { class TListItem }
 
-constructor TListItem.Create(
-	text: String;
-	style: TListItemStyle;
-	depth: Integer
-);
+constructor TListItem.Create;
 begin
-	FText := text;
-	FStyle := style;
-	FDepth := depth;
+end;
+
+function TListItem.GetKind: TElementKind;
+begin
+	exit(TElementKind.ListItem);
+end;
+
+function TListItem.Translate: TStringDynArray;
+begin
+	exit([]);
+end;
+
+function TListItem.ConsumeLine(line: String): Boolean;
+begin
+	exit(False);
 end;
 
 { class TList }
@@ -189,39 +312,113 @@ begin
 	exit([]);
 end;
 
+function TList.ConsumeLIne(line: String): Boolean;
+begin
+	exit(False);
+end;
+
 procedure TList.AddItem(text: String; style: TListItemStyle; depth: Integer);
 begin
-	FItems.Add(TListItem.Create(text, style, depth));
+	//FItems.Add(TListItem.Create(text, style, depth));
 end;
 
-{ class TBlock }
+{ class TIndentedCode }
 
-constructor TBlock.Create(language: String);
+constructor TIndentedCode.Create;
 begin
-	FLanguage := language;
 end;
 
-function TBlock.GetKind: TElementKind;
+function TIndentedCode.GetKind: TElementKind;
 begin
-	exit(TElementKind.Block);
+	exit(TElementKind.IndentedCode);
 end;
 
-function TBlock.Translate: TStringDynArray;
+function TIndentedCode.Translate: TStringDynArray;
+begin
+	exit([]);
+end;
+
+function TIndentedCode.ConsumeLine(line: String): Boolean;
+begin
+	//SetLength(FLines, Length(FLines) + 1);
+	//FLines[High(FLines)] := line;
+	exit(False);
+end;
+
+{ class TFencedCode }
+
+constructor TFencedCode.Create;
+begin
+	FState := TState.Start;
+end;
+
+function TFencedCode.GetKind: TElementKind;
+begin
+	exit(TElementKind.FencedCode);
+end;
+
+function TFencedCode.Translate: TStringDynArray;
 begin
 	exit(FLines);
 end;
 
-procedure TBlock.AddLine(line: String);
+function TFencedCode.ConsumeLine(line: String): Boolean;
+var
+	ix		: Integer;
+	trimmed	: String;
 begin
+	if FState = TState.Closed then
+		exit(False);
+
+	if FState = TState.Start then
+	begin
+		line := Trim(line);
+		FChar := line[1];
+		ix := 1;
+		while line[ix] = line[1] do
+			Inc(ix);
+
+		if ix < Length(line) then
+			FInfo := Copy(line, ix, Length(line) - ix);
+
+		FState := TState.Content;
+		exit(True);
+	end;
+
+	trimmed := Trim(line);
+	if Length(trimmed) > 0 then
+	begin
+		if trimmed[1] = FChar then
+		begin
+			ix := 1;
+			while line[ix] = FChar do
+				Inc(ix);
+
+			Debug(Format('encountered closing char, amount: %d', [ix]));
+			if ix >= 3 then
+			begin
+				FState := TState.Closed;
+				exit(True);
+			end;
+		end;
+	end;
+
 	SetLength(FLines, Length(FLines) + 1);
 	FLines[High(FLines)] := line;
+
+	Debug(Format(
+		'added one line to fenced code'#13#10'  -> line: %s',
+		[FLines[High(FLines)]]
+	));
+
+	exit(True);
 end;
 
 { class TTable }
 
-constructor TTable.Create(headers: TStringDynArray);
+constructor TTable.Create;
 begin
-	FHeaders := headers;
+	FState := TTableState.Header;
 end;
 
 function TTable.GetKind: TElementKind;
@@ -300,10 +497,35 @@ begin
 	result[High(result)] := lower;
 end;
 
-procedure TTable.AddRow(row: TStringDynArray);
+function TTable.ConsumeLine(line: String): Boolean;
+var
+	ix		: Integer;
+	strs	: TStringDynArray;
 begin
-	SetLength(FRows, Length(FRows) + 1);
-	FRows[High(FRows)] := row;
+	if not ExecRegExpr(TABLE_START_REGEX, line) then
+		exit(False);
+
+	if FState = TTableState.Seperator then
+	begin
+		FState := TTableState.Body;
+		exit(True);
+	end;
+
+	strs := SplitString(Copy(line, 2, RPos('|', line) - 2), '|');
+	for ix := 0 to Length(strs) - 1 do
+		strs[ix] := Trim(strs[ix]);
+
+	if FState = TTableState.Header then
+	begin
+		FHeaders := strs;
+		FState := TTableState.Seperator;
+	end else
+	begin
+		SetLength(FRows, Length(FRows) + 1);
+		FRows[High(FRows)] := strs;
+	end;
+
+	exit(True);
 end;
 
 end.

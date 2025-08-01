@@ -10,9 +10,11 @@ interface
 uses
 	elements,
 	fgl,
+	regexpr,
 	StrUtils,
 	SysUtils,
-	Types;
+	Types,
+	util;
 
 type
 	TSection = class
@@ -26,24 +28,14 @@ type
 
 	TSections = specialize TFPGList<TSection>;
 
-	TParserState = (Paragraph, TableSeperator, TableBody, Block, List);
-
 	TParser = class
 	private
-		FState		: TParserState;
-		FSections	: TSections;
-		FElements	: TElements;
+		FSections		: TSections;
+		FElements		: TElements;
+		FOpenElement	: Boolean;
 
-		FCurrentTable		: TTable;
-		FCurrentBlock		: TBlock;
-		FCurrentParagraph	: TParagraph;
-
-		function ParseHeader(const line: String): Boolean;
-		function ParseTableHeader(const line: String): Boolean;
-		function ParseTableSeperator(const line: String): Boolean;
-		function ParseTableBodyLine(const line: String): Boolean;
-		function ParseBlockStart(const line: String): Boolean;
-		function ParseBlockLine(const line: String): Boolean;
+		function	TryConsumption(const line: String): Boolean;
+		procedure	NewElement(element: TElement; const line: String);
 	public
 		constructor	Create;
 		function	ParseLine(const line: String): Boolean;
@@ -84,197 +76,82 @@ end;
 						rdi
 }
 
-function TParser.ParseHeader(const line: String): Boolean;
-var
-	n: Integer;
-	s: String;
-begin
-	n := 1;
-	while (line[n] = '#') do
-		Inc(n);
-
-	s := Trim(Copy(line, n, Length(line) - n + 1));
-
-	FSections.Add(TSection.Create(s));
-	FElements.Add(THeader.Create(n - 1, s));
-
-	exit(True);
-end;
-
-function TParser.ParseTableHeader(const line: String): Boolean;
-var
-	headers: TStringDynArray;
-	ix: SizeUInt;
-begin
-	if FCurrentTable <> Nil then
-	begin
-		WriteLn(StdErr, 'invalid state 1');
-		exit(False);
-	end;
-
-	headers := SplitString(Copy(line, 2, RPos('|', line) - 2), '|');
-	for ix := 0 to Length(headers) - 1 do
-		headers[ix] := Trim(headers[ix]);
-
-	FCurrentTable := TTable.Create(headers);
-	exit(True);
-end;
-
-function TParser.ParseTableSeperator(const line: String): Boolean;
-begin
-	if FCurrentTable = Nil then
-	begin
-		WriteLn(StdErr, 'invalid state 2');
-		exit(False);
-	end;
-
-	{ todo: do more with this? }
-
-	exit(True);
-end;
-
-function TParser.ParseTableBodyLine(const line: String): Boolean;
-var
-	trimmed	: String;
-	columns	: TStringDynArray;
-	ix		: SizeUInt;
-begin
-	if FCurrentTable = Nil then
-	begin
-		WriteLn(StdErr, 'invalid state 3');
-		exit(False);
-	end;
-
-	trimmed := Trim(line);
-	if (Length(trimmed) = 0) or (trimmed[1] <> '|') then
-	begin
-		FState := TParserState.Paragraph;
-		FElements.Add(FCurrentTable);
-		FCurrentTable := Nil;
-		exit(ParseLine(line));
-	end;
-
-	columns := SplitString(Copy(line, 2, RPos('|', line) - 2), '|');
-	for ix := 0 to Length(columns) - 1 do
-		columns[ix] := Trim(columns[ix]);
-
-	FCurrentTable.AddRow(columns);
-
-	exit(True);
-end;
-
-function TParser.ParseBlockStart(const line: String): Boolean;
-begin
-	if FCurrentBlock <> Nil then
-	begin
-		WriteLn(StdErr, 'invalid state 4');
-		exit(False);
-	end;
-
-	FCurrentBlock := TBlock.Create(Trim(SplitString(line, '```')[1]));
-	exit(True);
-end;
-
-function TParser.ParseBlockLine(const line: String): Boolean;
-begin
-	if FCurrentBlock = Nil then
-	begin
-		WriteLn(StdErr, 'invalid state 5');
-		exit(False);
-	end;
-
-	if StartsStr('```', Trim(line)) then
-	begin
-		FState := TParserState.Paragraph;
-		FElements.Add(FCurrentBlock);
-		FCurrentBlock := Nil;
-		exit(True);
-	end;
-
-	FCurrentBlock.AddLine(line);
-	exit(True);
-end;
-
 constructor TParser.Create;
 begin
 	FSections := TSections.Create;
 	FElements := TElements.Create;
-	FState := TParserState.Paragraph;
+	FOpenElement := False;
+end;
+
+function TParser.TryConsumption(const line: String): Boolean;
+begin
+	if FOpenElement then
+	begin
+		if FElements.Last.ConsumeLine(line) then
+			exit(True);
+
+		Debug('open element didn''t consume line, closing it');
+		FOpenElement := False;
+
+		if FElements.Last.Kind = TElementKind.Heading then
+			FSections.Add(TSection.Create(FElements.Last.Translate[0]));
+	end;
+
+	exit(False);
+end;
+
+procedure TParser.NewElement(element: TElement; const line: String);
+begin
+	FElements.Add(element);
+	FOpenElement := True;
+	TryConsumption(line);
 end;
 
 function TParser.ParseLine(const line: String): Boolean;
-var
-	trimmed: String;
 begin
-	trimmed := Trim(line);
+	if ((FElements.Count > 0) and (FElements.Last.Kind <> TElementKind.Paragraph))
+	and TryConsumption(line) then
+		exit(True);
 
-	case FState of
-	TParserState.Paragraph: begin
-		if Length(trimmed) = 0 then
+	if ExecRegExpr(HEADING_REGEX, line) then
+	begin
+		Debug('started a heading element');
+		NewElement(THeading.Create, line);
+	end else if ExecRegExpr(FENCED_CODE_REGEX, line) then
+	begin
+		Debug('started a fenced code element');
+		NewElement(TFencedCode.Create, line);
+	end else if ExecRegExpr(BLOCK_QUOTE_REGEX, line) then
+	begin
+		Debug('started a block quote element');
+		NewElement(TBlockQuote.Create, line);
+	end else if ExecRegExpr(LIST_ELEMENT_REGEX, line) then
+	begin
+		Debug('started a list element');
+		NewElement(TList.Create, line);
+	end else if ExecRegExpr(TABLE_START_REGEX, line) then
+	begin
+		Debug('started a table element');
+		NewElement(TTable.Create, line);
+	end else if Length(Trim(line)) > 0 then
+	begin
+		if (FElements.Count > 0) and (FElements.Last.Kind <> TElementKind.Paragraph) then
 		begin
-			if FCurrentParagraph = Nil then
-				FCurrentParagraph := TParagraph.Create;
-
-			FCurrentParagraph.AddLine('');
-			exit(True);
-		end;
-
-		if trimmed[1] = '#' then
+			Debug('started a paragraph element');
+			NewElement(TParagraph.Create, line);
+		end else
 		begin
-			if FCurrentParagraph <> Nil then
-				FElements.Add(FCurrentParagraph);
-			FCurrentParagraph := Nil;
-			exit(ParseHeader(line));
+			FOpenElement := True;
+			TryConsumption(line);
 		end;
+	end else
+		Debug(Format('discarding line "%s"', [line]));
 
-		if trimmed[1] = '|' then
-		begin
-			if FCurrentParagraph <> Nil then
-				FElements.Add(FCurrentParagraph);
-			FCurrentParagraph := Nil;
-			FState := TParserState.TableSeperator;
-			exit(ParseTableHeader(line));
-		end;
-
-		if StartsStr('```', trimmed) then
-		begin
-			if FCurrentParagraph <> Nil then
-				FElements.Add(FCurrentParagraph);
-			FCurrentParagraph := Nil;
-			FState := TParserState.Block;
-			exit(ParseBlockStart(line));
-		end;
-
-		if FCurrentParagraph = Nil then
-			FCurrentParagraph := TParagraph.Create;
-
-		FCurrentParagraph.AddLine(line);
-	end;
-	TParserState.TableSeperator: begin
-		FState := TParserState.TableBody;
-		exit(ParseTableSeperator(line));
-	end;
-	TParserState.TableBody: begin
-		exit(ParseTableBodyLine(line));
-	end;
-	TParserState.Block: begin
-		exit(ParseBlockLine(line));
-	end;
-	end;
-
-	exit(true);
+	exit(True);
 end;
 
 procedure TParser.Finish;
 begin
-	if FCurrentParagraph <> Nil then
-		FElements.Add(FCurrentParagraph);
-
-	if FCurrentBlock <> Nil then
-		FElements.Add(FCurrentBlock);
-
-	if FCurrentTable <> Nil then
-		FElements.Add(FCurrentTable);
 end;
 
 end.
