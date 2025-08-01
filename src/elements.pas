@@ -9,6 +9,7 @@ interface
 
 uses
 	fgl,
+	regexpr,
 	SysUtils,
 	Types,
 	util;
@@ -62,6 +63,13 @@ type
 	end;
 
 	TFencedCode = class(TInterfacedObject, TElement)
+	type
+		TState = (Start, Content, Closed);
+	private
+		FState	: TState;
+		FChar	: Char;
+		FInfo	: String;
+		FLines	: TStringDynArray;
 	public
 		constructor	Create;
 		function	GetKind: TElementKind;
@@ -82,6 +90,8 @@ type
 	end;
 
 	TBlockQuote = class(TInterfacedObject, TElement)
+	private
+		FLines	: TStringDynArray;
 	public
 		constructor	Create;
 		function	GetKind: TElementKind;
@@ -130,13 +140,20 @@ type
 		FHeaders	: TStringDynArray;
 		FRows		: array of TStringDynArray;
 	public
-		constructor	Create(headers: TStringDynArray);
+		constructor	Create;
 		function	GetKind: TElementKind;
 		function	Translate: TStringDynArray;
 		function	ConsumeLine(line: String): Boolean;
 
 		property	Kind: TElementKind read GetKind;
 	end;
+
+const
+	HEADING_REGEX = '[ ]{0,3}[#]{1,6}.*';
+	FENCED_CODE_REGEX = '[ ]{0,3}(```|~~~).*';
+	BLOCK_QUOTE_REGEX = '[ ]{0,3}>.*';
+	LIST_ELEMENT_REGEX = '[ ]*([-+*]|[0-9]+[\.\)])[ ]+.*';
+	TABLE_START_REGEX = '[ ]{0,3}\|.*\|';
 
 function MakeHorSeperator(w: Integer): String;
 
@@ -156,6 +173,7 @@ end;
 constructor THeading.Create;
 begin
 	FLevel := -1;
+	FContent := '';
 end;
 
 function THeading.GetKind: TElementKind;
@@ -164,13 +182,29 @@ begin
 end;
 
 function THeading.ConsumeLine(line: String): Boolean;
+var
+	n: Integer;
 begin
 	Debug(Format('heading attempting to consume line (FLevel = %d)', [FLevel]));
 	if FLevel <> -1 then
 		exit(False);
 
-	FContent := line;
-	FLevel := 1;
+	line := Trim(line);
+	n := 1;
+	while (line[n] = '#') do
+		Inc(n);
+
+	FContent := Copy(line, n, Length(line) - 1 + 1);
+	FLevel := n - 1;
+
+	Debug(Format(
+		'parsed heading'#13#10'  -> content: %s'#13#10'  -> level: %d',
+		[
+			FContent,
+			FLevel
+		]
+	));
+
 	exit(True);
 end;
 
@@ -198,11 +232,17 @@ end;
 function TParagraph.ConsumeLine(line: String): Boolean;
 begin
 	if Length(line) = 0 then
-		exit(True);
+	begin
+		Debug('line is empty, closing paragraph');
+		exit(False);
+	end;
 
 	SetLength(FLines, Length(FLines) + 1);
 	FLines[High(FLines)] := line;
-	exit(False);
+
+	Debug('appended one line to paragraph');
+
+	exit(True);
 end;
 
 { class TBlockQuote }
@@ -222,10 +262,23 @@ begin
 end;
 
 function TBlockQuote.ConsumeLine(line: String): Boolean;
+var
+	ix: Integer;
 begin
-	//SetLength(FLines, Length(FLines) + 1);
-	//FLines[High(FLines)] := line;
-	exit(False);
+	if not ExecRegExpr(BLOCK_QUOTE_REGEX, line) then
+		exit(False);
+
+	ix := Pos('>', line);
+
+	SetLength(FLines, Length(FLines) + 1);
+	FLines[High(FLines)] := Copy(line, ix + 1, Length(line) - ix);
+
+	Debug(Format(
+		'added one line to block quote'#13#10'  -> line: %s',
+		[FLines[High(FLines)]]
+	));
+
+	exit(True);
 end;
 
 { class TListItem }
@@ -303,6 +356,7 @@ end;
 
 constructor TFencedCode.Create;
 begin
+	FState := TState.Start;
 end;
 
 function TFencedCode.GetKind: TElementKind;
@@ -316,17 +370,61 @@ begin
 end;
 
 function TFencedCode.ConsumeLine(line: String): Boolean;
+var
+	ix		: Integer;
+	trimmed	: String;
 begin
-	//SetLength(FLines, Length(FLines) + 1);
-	//FLines[High(FLines)] := line;
-	exit(False);
+	if FState = TState.Closed then
+		exit(False);
+
+	if FState = TState.Start then
+	begin
+		line := Trim(line);
+		FChar := line[1];
+		ix := 1;
+		while line[ix] = line[1] do
+			Inc(ix);
+
+		if ix < Length(line) then
+			FInfo := Copy(line, ix, Length(line) - ix);
+
+		FState := TState.Content;
+		exit(True);
+	end;
+
+	trimmed := Trim(line);
+	if Length(trimmed) > 0 then
+	begin
+		if trimmed[1] = FChar then
+		begin
+			ix := 1;
+			while line[ix] = FChar do
+				Inc(ix);
+
+			Debug(Format('encountered closing char, amount: %d', [ix]));
+			if ix >= 3 then
+			begin
+				FState := TState.Closed;
+				exit(True);
+			end;
+		end;
+	end;
+
+	SetLength(FLines, Length(FLines) + 1);
+	FLines[High(FLines)] := line;
+
+	Debug(Format(
+		'added one line to fenced code'#13#10'  -> line: %s',
+		[FLines[High(FLines)]]
+	));
+
+	exit(True);
 end;
 
 { class TTable }
 
-constructor TTable.Create(headers: TStringDynArray);
+constructor TTable.Create;
 begin
-	FHeaders := headers;
 end;
 
 function TTable.GetKind: TElementKind;

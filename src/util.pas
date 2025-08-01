@@ -14,7 +14,7 @@ implementation
 procedure Debug(const msg: String);
 begin
 {$IFDEF HAVE_DEBUG_LOGS}
-	WriteLn(StdErr, '[DEBUG] ', msg);
+	WriteLn(StdErr, msg);
 {$ENDIF}
 end;
 

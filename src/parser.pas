@@ -88,13 +88,13 @@ begin
 	if FOpenElement then
 	begin
 		if FElements.Last.ConsumeLine(line) then
-		begin
-			Debug('open element consumed one line');
 			exit(True);
-		end;
 
 		Debug('open element didn''t consume line, closing it');
 		FOpenElement := False;
+
+		if FElements.Last.Kind = TElementKind.Heading then
+			FSections.Add(TSection.Create(FElements.Last.Translate[0]));
 	end;
 
 	exit(False);
@@ -109,25 +109,41 @@ end;
 
 function TParser.ParseLine(const line: String): Boolean;
 begin
-	if TryConsumption(line) then
+	if ((FElements.Count > 0) and (FElements.Last.Kind <> TElementKind.Paragraph))
+	and TryConsumption(line) then
 		exit(True);
 
-	if ExecRegExpr('[ ]{0,3}[#]{1,6}.*', line) then
+	if ExecRegExpr(HEADING_REGEX, line) then
 	begin
 		Debug('started a heading element');
 		NewElement(THeading.Create, line);
-	end else if ExecRegExpr('[ ]{0,3}(```|~~~).*', line) then
+	end else if ExecRegExpr(FENCED_CODE_REGEX, line) then
 	begin
 		Debug('started a fenced code element');
 		NewElement(TFencedCode.Create, line);
-	end else if ExecRegExpr('[ ]{0,3}>.*', line) then
+	end else if ExecRegExpr(BLOCK_QUOTE_REGEX, line) then
 	begin
 		Debug('started a block quote element');
 		NewElement(TBlockQuote.Create, line);
-	end else if ExecRegExpr('[ ]*([-+*]|[0-9]+[\.\)])[ ]+.*', line) then
+	end else if ExecRegExpr(LIST_ELEMENT_REGEX, line) then
 	begin
 		Debug('started a list element');
 		NewElement(TList.Create, line);
+	end else if ExecRegExpr(TABLE_START_REGEX, line) then
+	begin
+		Debug('started a table element');
+		NewElement(TTable.Create, line);
+	end else
+	begin
+		if (FElements.Count > 0) and (FElements.Last.Kind <> TElementKind.Paragraph) then
+		begin
+			Debug('started a paragraph element');
+			NewElement(TParagraph.Create, line);
+		end else
+		begin
+			FOpenElement := True;
+			TryConsumption(line);
+		end;
 	end;
 
 	exit(True);
