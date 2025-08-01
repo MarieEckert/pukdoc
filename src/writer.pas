@@ -101,7 +101,7 @@ begin
 		element := parser.Elements.Items[i];
 
 		case element.Kind of
-		TElementKind.Header: begin
+		TElementKind.Heading: begin
 				if firstHeader then
 				begin
 					firstHeader := False;
@@ -111,7 +111,7 @@ begin
 				result += element.Translate[0] + sLineBreak;
 
 				if (i + 1 >= parser.Elements.Count)
-				or (parser.Elements.Items[i + 1].Kind <> TElementKind.Header)
+				or (parser.Elements.Items[i + 1].Kind <> TElementKind.Heading)
 				then
 					result += MakeHorSeperator(MAX_WIDTH) + sLineBreak;
 			end;
@@ -119,7 +119,7 @@ begin
 				for s in element.Translate do
 					result += DoWrapping(INDENT + s);
 			end;
-		TElementKind.Block: begin
+		TElementKind.FencedCode: begin
 				for s in element.Translate do
 					result += s + sLineBreak;
 

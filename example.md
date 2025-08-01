@@ -7,6 +7,22 @@ and simple. It is focused on filesystem interactions and process management.
 
 ## 1. Syscall Listing
 
+1. ordered list test
+2. second item
+  - note on the second item
+3. third item
+
+1) second ordered list test
+2) enough
+
+* bullet list (stars)
+  * sub bullet
+* another thing
+
+- bullet list (dashes)
+  - sub bullet
+- enough
+
 Preliminary list of syscalls.
 ```
   Files/Filesystem

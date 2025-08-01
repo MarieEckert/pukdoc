@@ -1,15 +1,15 @@
-MTEST_SOURCE = mtest/src
+PPCFLAGS := -FE"obj/" -Fu"TRegExpr/src"
 
 .PHONY: debug
 debug:
 	@mkdir -p obj
-	fpc src/pukdoc.pas -FE"obj/" -gl
+	fpc src/pukdoc.pas -dHAVE_DEBUG_LOGS ${PPCFLAGS} -gl
 	@mv obj/pukdoc .
 
 .PHONY: release
 release:
 	@mkdir -p obj
-	fpc src/pukdoc.pas -FE"obj/" -XX -Xs
+	fpc src/pukdoc.pas ${PPCFLAGS} -XX -Xs
 	@mv obj/pukdoc .
 
 .PHONY: clean
