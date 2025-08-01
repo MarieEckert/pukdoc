@@ -9,7 +9,7 @@ and simple. It is focused on filesystem interactions and process management.
 
 1. ordered list test
 2. second item
-  - note on the second item
+    1. note on the second item
 3. third item
 
 1) second ordered list test
