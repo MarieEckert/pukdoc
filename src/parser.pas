@@ -56,26 +56,6 @@ end;
 
 { class TParser }
 
-{
-	Document
-		Element[Header]
-			Level: 2
-			Content: Introduction
-		Element[Paragraph]
-			Content: ...
-		Element[Table]
-			Content
-				Headers
-					Arch
-					return
-					arg1
-				Rows
-					0
-						x64
-						rdx:rax
-						rdi
-}
-
 constructor TParser.Create;
 begin
 	FSections := TSections.Create;
@@ -85,17 +65,17 @@ end;
 
 function TParser.TryConsumption(const line: String): Boolean;
 begin
-	if FOpenElement then
-	begin
-		if FElements.Last.ConsumeLine(line) then
-			exit(True);
+	if not FOpenElement then
+		exit(False);
 
-		Debug('open element didn''t consume line, closing it');
-		FOpenElement := False;
+	if FElements.Last.ConsumeLine(line) then
+		exit(True);
 
-		if FElements.Last.Kind = TElementKind.Heading then
-			FSections.Add(TSection.Create(FElements.Last.Translate[0]));
-	end;
+	Debug('open element didn''t consume line, closing it');
+	FOpenElement := False;
+
+	if FElements.Last.Kind = TElementKind.Heading then
+		FSections.Add(TSection.Create(FElements.Last.Translate[0]));
 
 	exit(False);
 end;
@@ -109,7 +89,8 @@ end;
 
 function TParser.ParseLine(const line: String): Boolean;
 begin
-	if ((FElements.Count > 0) and (FElements.Last.Kind <> TElementKind.Paragraph))
+	if ((FElements.Count > 0)
+	and (FElements.Last.Kind <> TElementKind.Paragraph))
 	and TryConsumption(line) then
 		exit(True);
 
@@ -135,7 +116,8 @@ begin
 		NewElement(TTable.Create, line);
 	end else if Length(Trim(line)) > 0 then
 	begin
-		if (FElements.Count > 0) and (FElements.Last.Kind <> TElementKind.Paragraph) then
+		if (FElements.Count > 0)
+		and (FElements.Last.Kind <> TElementKind.Paragraph) then
 		begin
 			Debug('started a paragraph element');
 			NewElement(TParagraph.Create, line);

@@ -153,11 +153,11 @@ type
 	end;
 
 const
-	HEADING_REGEX = '[ ]{0,3}[#]{1,6}.*';
-	FENCED_CODE_REGEX = '[ ]{0,3}(```|~~~).*';
-	BLOCK_QUOTE_REGEX = '[ ]{0,3}>.*';
-	LIST_ELEMENT_REGEX = '[ ]*([-+*]|[0-9]+[\.\)])[ ]+.*';
-	TABLE_START_REGEX = '[ ]{0,3}\|.*\|';
+	HEADING_REGEX		: UnicodeString = '[ ]{0,3}[#]{1,6}.*';
+	FENCED_CODE_REGEX	: UnicodeString = '[ ]{0,3}(```|~~~).*';
+	BLOCK_QUOTE_REGEX	: UnicodeString = '[ ]{0,3}>.*';
+	LIST_ELEMENT_REGEX	: UnicodeString = '[ ]*([-+*]|[0-9]+[\.\)])[ ]+.*';
+	TABLE_START_REGEX	: UnicodeString = '[ ]{0,3}\|.*\|';
 
 implementation
 
