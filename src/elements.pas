@@ -187,7 +187,7 @@ begin
 	while (line[n] = '#') do
 		Inc(n);
 
-	FContent := Copy(line, n, Length(line) - 1 + 1);
+	FContent := Trim(Copy(line, n, Length(line) - 1 + 1));
 	FLevel := n - 1;
 
 	Debug(Format(
